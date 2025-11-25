@@ -214,7 +214,7 @@ function App() {
         <div>
           <p className="eyebrow">Data Structures Lab</p>
           <h1>
-            RouteCraft <span>· React</span>
+            RouteCraft<span>· React</span>
           </h1>
           <p className="lede">
             Draw walls, pick an algorithm, and watch how each search strategy
@@ -242,7 +242,7 @@ function App() {
                   <button
                     key={s.id}
                     type="button"
-                    className={`pill ${speed === s.id ? 'active' : ''}`}
+                    className={`pill ${speed === s.id ? "active" : ""}`}
                     onClick={() => setSpeed(s.id)}
                     disabled={isRunning}
                   >
@@ -258,7 +258,7 @@ function App() {
                 onClick={runVisualization}
                 disabled={isRunning}
               >
-                {isRunning ? 'Animating...' : 'Find Path'}
+                {isRunning ? "Animating..." : "Find Path"}
               </button>
               <button
                 type="button"
@@ -299,7 +299,7 @@ function App() {
             <button
               key={option.id}
               type="button"
-              className={`pill ghost ${brush === option.id ? 'active' : ''}`}
+              className={`pill ghost ${brush === option.id ? "active" : ""}`}
               onClick={() => setBrush(option.id)}
               disabled={isRunning}
             >
@@ -336,7 +336,7 @@ function App() {
                 onMouseUp={() => setIsDragging(false)}
                 onMouseLeave={() => setIsDragging(false)}
               />
-            )),
+            ))
           )}
         </div>
       </section>

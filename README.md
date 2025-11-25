@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #  RouteCraft (React)
+=======
+# RouteCraft (React)
+>>>>>>> 0192d4d (rename)
 
 An interactive React app that visualizes classic pathfinding algorithms. Draw obstacles, move start/goal, choose an algorithm, and watch the search animate step by step.
 
