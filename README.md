@@ -1,4 +1,4 @@
-# Pathfinding Studio (React)
+#  RouteCraft (React)
 
 An interactive React app that visualizes classic pathfinding algorithms. Draw obstacles, move start/goal, choose an algorithm, and watch the search animate step by step.
 
