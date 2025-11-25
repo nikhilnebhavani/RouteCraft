@@ -214,7 +214,7 @@ function App() {
         <div>
           <p className="eyebrow">Data Structures Lab</p>
           <h1>
-            Pathfinding Studio<span>· React</span>
+            RouteCraft <span>· React</span>
           </h1>
           <p className="lede">
             Draw walls, pick an algorithm, and watch how each search strategy
