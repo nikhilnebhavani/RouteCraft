@@ -20,7 +20,10 @@ Open the dev server URL from the terminal output. For a production bundle, run `
 - Five algorithms: A* Search, Dijkstra, Breadth-First Search, Depth-First Search, Greedy Best-First.
 - Click/drag brushes to add walls, erase, or move start/goal.
 - Adjustable animation speeds.
-- Live stats: visited node count and resulting path length.
+- Experience modes for beginners vs. pros with contextual tips.
+- Live stats: visited node count, path length, and runtime.
+- Maze generator with adjustable density for stress tests.
+- Run history log to compare algorithms back-to-back.
 - One-click clear trails, clear walls, or full reset.
 
 ## Controls

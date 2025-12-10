@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import {
   aStar,
@@ -21,12 +21,30 @@ const SPEEDS = [
   { id: 'slow', label: 'Chill', delay: 45 },
 ];
 
+const experienceModes = [
+  { id: 'beginner', label: 'Beginner' },
+  { id: 'pro', label: 'Pro' },
+];
+
 const brushOptions = [
   { id: 'wall', label: 'Walls' },
   { id: 'erase', label: 'Erase' },
   { id: 'start', label: 'Move Start' },
   { id: 'goal', label: 'Move Goal' },
 ];
+
+const tips = {
+  beginner: [
+    'Start with BFS or Dijkstra for guaranteed shortest paths on an open grid.',
+    'Click and drag Walls to shape the map, then press Find Path to animate.',
+    'Use Clear Trails to keep your walls while you compare algorithms.',
+  ],
+  pro: [
+    'Generate a maze, then compare visited counts between A* and Dijkstra.',
+    'Greedy Best-First is fast but risky; drag the goal to see where it fails.',
+    'Lower speed on dense mazes to spot backtracking patterns.',
+  ],
+};
 
 const buildGrid = (start, goal) =>
   Array.from({ length: ROWS }, (_, row) =>
@@ -49,10 +67,19 @@ function App() {
   const [speed, setSpeed] = useState('smooth');
   const [isDragging, setIsDragging] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [experience, setExperience] = useState('beginner');
+  const [mazeDensity, setMazeDensity] = useState(0.28);
   const [status, setStatus] = useState(
     'Add walls, move start/end, then run a search.',
   );
-  const [metrics, setMetrics] = useState({ visited: 0, path: 0 });
+  const [metrics, setMetrics] = useState({ visited: 0, path: 0, runtime: 0 });
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    const handleMouseUp = () => setIsDragging(false);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, []);
 
   const delay = useMemo(
     () => SPEEDS.find((s) => s.id === speed)?.delay ?? 22,
@@ -89,7 +116,7 @@ function App() {
       }),
     );
     setGrid(cleaned);
-    setMetrics({ visited: 0, path: 0 });
+    setMetrics({ visited: 0, path: 0, runtime: 0 });
     return cleaned;
   };
 
@@ -98,7 +125,7 @@ function App() {
     setGoal(DEFAULT_GOAL);
     setGrid(buildGrid(DEFAULT_START, DEFAULT_GOAL));
     setStatus('Board reset.');
-    setMetrics({ visited: 0, path: 0 });
+    setMetrics({ visited: 0, path: 0, runtime: 0 });
   };
 
   const moveStart = (row, col) => {
@@ -168,44 +195,84 @@ function App() {
   };
 
   const runVisualization = async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setStatus(`Running ${algorithmLookup[algorithm]}...`);
-    const prepared = clearTrails(false);
-
-    const walls = new Set();
-    prepared.forEach((row) =>
-      row.forEach((cell) => {
-        if (cell.status === 'wall') walls.add(serialize(cell.row, cell.col));
-      }),
-    );
-
-    const runner = algoRunner[algorithm];
-    if (!runner) {
-      setStatus('Pick an algorithm to begin.');
-      setIsRunning(false);
+    if (isRunning) {
+      setStatus('Already running, please wait for this run to finish.');
       return;
     }
+    setIsRunning(true);
+    setStatus(`Running ${algorithmLookup[algorithm]}...`);
+    try {
+      const prepared = clearTrails(false);
 
-    const { visitedOrder, path } = runner({
-      rows: ROWS,
-      cols: COLS,
-      start,
-      goal,
-      walls,
-    });
+      const walls = new Set();
+      prepared.forEach((row) =>
+        row.forEach((cell) => {
+          if (cell.status === 'wall') walls.add(serialize(cell.row, cell.col));
+        }),
+      );
 
-    await runAnimation(visitedOrder, 'visited');
-    await runAnimation(path, 'path');
+      const runner = algoRunner[algorithm];
+      if (!runner) {
+        setStatus('Pick an algorithm to begin.');
+        return;
+      }
 
-    const pathLength = path.length ? path.length - 1 : 0;
-    setMetrics({ visited: visitedOrder.length, path: pathLength });
-    setStatus(
-      pathLength > 0
-        ? `Path found in ${pathLength} steps using ${algorithmLookup[algorithm]}.`
-        : 'No path found. Tweak the map and try again.',
+      const startedAt = performance.now();
+      const { visitedOrder, path } = runner({
+        rows: ROWS,
+        cols: COLS,
+        start,
+        goal,
+        walls,
+      });
+
+      await runAnimation(visitedOrder, 'visited');
+      await runAnimation(path, 'path');
+
+      const pathLength = path.length ? path.length - 1 : 0;
+      const elapsed = Math.round(performance.now() - startedAt);
+      const runMetrics = { visited: visitedOrder.length, path: pathLength, runtime: elapsed };
+      setMetrics(runMetrics);
+      setHistory((prev) =>
+        [
+          {
+            id: `${Date.now()}-${algorithm}`,
+            algo: algorithmLookup[algorithm],
+            ...runMetrics,
+            time: new Date().toLocaleTimeString(),
+          },
+          ...prev,
+        ].slice(0, 5),
+      );
+      setStatus(
+        pathLength > 0
+          ? `Path found in ${pathLength} steps using ${algorithmLookup[algorithm]} (${elapsed}ms).`
+          : 'No path found. Tweak the map and try again.',
+      );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      setStatus('Something went wrong while running the search.');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const generateMaze = () => {
+    if (isRunning) return;
+    const density = Math.max(0, Math.min(0.6, Number(mazeDensity)));
+    const nextGrid = grid.map((r) =>
+      r.map((cell) => {
+        if (cell.status === 'start' || cell.status === 'goal') return cell;
+        const isWall = Math.random() < density;
+        return { ...cell, status: isWall ? 'wall' : 'empty' };
+      }),
     );
-    setIsRunning(false);
+    setGrid(nextGrid);
+    setMetrics({ visited: 0, path: 0, runtime: 0 });
+    setStatus(
+      `New maze generated at ${Math.round(density * 100)}% density. Press Find Path to compare algorithms.`,
+    );
   };
 
   return (
@@ -221,6 +288,22 @@ function App() {
             threads its way from A to B.
           </p>
           <div className="hero-actions">
+            <label className="field">
+              <span>Experience</span>
+              <div className="pill-group">
+                {experienceModes.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    className={`pill ${experience === mode.id ? 'active' : ''}`}
+                    onClick={() => setExperience(mode.id)}
+                    disabled={isRunning}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </label>
             <label className="field">
               <span>Algorithm</span>
               <select
@@ -289,9 +372,54 @@ function App() {
             <p>Path Length</p>
             <strong>{metrics.path}</strong>
           </div>
+          <div className="stat">
+            <p>Runtime</p>
+            <strong>{metrics.runtime}ms</strong>
+          </div>
           <p className="status">{status}</p>
         </div>
       </header>
+
+      <section className="learn-grid">
+        <div className="panel">
+          <div className="panel-head">
+            <p className="eyebrow subtle">
+              {experience === 'beginner' ? 'Quick start' : 'Pro drills'}
+            </p>
+            <p className="pill ghost label">{experience} mode</p>
+          </div>
+          <ul className="tip-list">
+            {tips[experience].map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="panel history">
+          <div className="panel-head">
+            <p className="eyebrow subtle">Recent runs</p>
+            <p className="muted">Last 5 attempts</p>
+          </div>
+          {history.length ? (
+            <ul>
+              {history.map((item) => (
+                <li key={item.id} className="history-row">
+                  <div>
+                    <strong>{item.algo}</strong>
+                    <p className="muted">{item.time}</p>
+                  </div>
+                  <div className="history-metrics">
+                    <span>{item.visited} visited</span>
+                    <span>{item.path} steps</span>
+                    <span>{item.runtime}ms</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">Run an algorithm to log stats.</p>
+          )}
+        </div>
+      </section>
 
       <section className="board-controls">
         <div className="brushes">
@@ -307,6 +435,29 @@ function App() {
             </button>
           ))}
         </div>
+        <div className="maze-controls">
+          <label className="field inline">
+            <span>Maze Density</span>
+            <input
+              type="range"
+              min="0"
+              max="0.6"
+              step="0.05"
+              value={mazeDensity}
+              onChange={(e) => setMazeDensity(Number(e.target.value))}
+              disabled={isRunning}
+            />
+            <span className="value">{Math.round(mazeDensity * 100)}%</span>
+          </label>
+          <button
+            type="button"
+            className="pill"
+            onClick={generateMaze}
+            disabled={isRunning}
+          >
+            Generate Maze
+          </button>
+        </div>
         <div className="legend">
           <span className="chip start">Start</span>
           <span className="chip goal">Goal</span>
@@ -321,6 +472,9 @@ function App() {
           className="grid"
           onMouseUp={() => setIsDragging(false)}
           onMouseLeave={() => setIsDragging(false)}
+          onMouseEnter={(e) => {
+            if (e.buttons === 1) setIsDragging(true);
+          }}
         >
           {grid.map((row) =>
             row.map((cell) => (
@@ -328,13 +482,18 @@ function App() {
                 type="button"
                 key={`${cell.row}-${cell.col}`}
                 className={`cell ${cell.status}`}
-                onMouseDown={() => {
+                onMouseDown={(e) => {
+                  if (e.button !== 0) return;
                   setIsDragging(true);
                   applyBrush(cell.row, cell.col);
                 }}
-                onMouseEnter={() => applyBrush(cell.row, cell.col, isDragging)}
+                onMouseEnter={(e) => {
+                  const dragging = isDragging || e.buttons === 1;
+                  applyBrush(cell.row, cell.col, dragging);
+                }}
                 onMouseUp={() => setIsDragging(false)}
                 onMouseLeave={() => setIsDragging(false)}
+                onClick={() => applyBrush(cell.row, cell.col)}
               />
             ))
           )}
